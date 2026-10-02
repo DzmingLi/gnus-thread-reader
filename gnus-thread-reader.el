@@ -10,7 +10,8 @@
 
 ;; Run `gnus-thread-reader-open' in a Gnus summary to read its current
 ;; conversation as a continuous Outline tree.  Gnus owns all article marks
-;; and reply composition.  Loading or navigating never marks articles read.
+;; and reply composition.  Visiting a loaded article marks that article read;
+;; background loading does not mark other articles read.
 ;; Only the thread headers already known to the summary are included.
 
 ;;; Code:
@@ -33,6 +34,7 @@
 (defvar-local gnus-thread-reader--queue nil)
 (defvar-local gnus-thread-reader--timer nil)
 (defvar-local gnus-thread-reader--generation 0)
+(defvar-local gnus-thread-reader--last-visited-id nil)
 (defvar-local gnus-thread-reader-focus-ids nil
   "Optional list of article IDs to visit with `N', such as notification targets.")
 
@@ -230,6 +232,29 @@ Never run an attachment viewer or fetch remote resources."
         (error "Article unavailable from Gnus"))
       (gnus-thread-reader--body-from-buffer))))
 
+(defun gnus-thread-reader--mark-current-read ()
+  "Mark the loaded article at point read once when it is visited.
+Prefetched articles and a manual unread mark on the same article are left alone."
+  (when-let* ((id (thread-reader--current-id))
+              ((not (equal id gnus-thread-reader--last-visited-id)))
+              ((gethash id gnus-thread-reader--bodies))
+              (header (gethash id gnus-thread-reader--headers))
+              (number (mail-header-number header))
+              ((> number 0)))
+    (gnus-thread-reader--checked-header number (mail-header-id header))
+    (setq gnus-thread-reader--last-visited-id id)
+    (with-current-buffer (gnus-thread-reader--source)
+      (when (eq (gnus-summary-article-mark number) gnus-unread-mark)
+        (gnus-summary-mark-article number gnus-read-mark)
+        (gnus-set-mode-line 'summary)
+        t))))
+
+(defun gnus-thread-reader--visit-at-point ()
+  "Update Gnus read state after moving to a loaded article."
+  (when (and (derived-mode-p 'gnus-thread-reader-mode)
+             (gnus-thread-reader--mark-current-read))
+    (gnus-thread-reader--render)))
+
 (defun gnus-thread-reader--load-one (buffer generation)
   "Load one article for BUFFER if GENERATION is current."
   (when (buffer-live-p buffer)
@@ -255,6 +280,7 @@ Never run an attachment viewer or fetch remote resources."
                           (thread-reader-entry-body entry)
                           (if failure (format "[Loading failed: %s. Press g to retry.]" failure)
                             (cdr result)))
+                    (unless failure (gnus-thread-reader--mark-current-read))
                     (gnus-thread-reader--render)
                     (gnus-thread-reader--schedule)))))
           (error
@@ -437,12 +463,14 @@ News articles use followup; mail articles use reply-to-author."
 
 (define-derived-mode gnus-thread-reader-mode thread-reader-mode "Gnus Thread"
   "Read a Gnus conversation continuously, with Outline folding.
-Loading and navigation do not mark articles read; use d explicitly.
+Visiting a loaded article marks it read.  Background loading leaves other
+articles unread.
 \{gnus-thread-reader-mode-map}"
   (setq-local thread-reader-auto-load-replies nil)
   (setq-local revert-buffer-function #'gnus-thread-reader-refresh)
   (setq gnus-thread-reader--headers (make-hash-table :test #'equal)
         gnus-thread-reader--bodies (make-hash-table :test #'equal))
+  (add-hook 'post-command-hook #'gnus-thread-reader--visit-at-point nil t)
   (add-hook 'kill-buffer-hook #'gnus-thread-reader--cancel nil t)
   (add-hook 'change-major-mode-hook #'gnus-thread-reader--cancel nil t))
 
