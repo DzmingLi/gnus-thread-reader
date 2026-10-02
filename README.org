@@ -1,0 +1,23 @@
+#+title: gnus-thread-reader
+
+将 Gnus 已知的一段讨论渲染成连续 Outline 回复树。视图实现随本包安装，不再需要单独安装 thread-reader。GPL-3.0-or-later。
+Gnus 负责取文、MIME、阅读状态、缓存和 message-mode 撰写；视图不创建第二套状态数据库。
+
+将目录加入 load-path，在 Gnus summary 中执行 ~M-x gnus-thread-reader-open~ 。
+也可以启用 ~gnus-thread-reader-summary-mode~ ，用 ~C-c C-t~ 打开。
+
+~n/p~ 移动楼层，~TAB~ 折叠，~N~ 下一未读，~d~ 标记当前楼已读，~U~ 未读，
+~!~ 稍后读，~?~ dormant，~*~ Gnus 缓存，~r~ 回复，~C-u r~ 引用回复，
+~o~ 原生文章查看器，~s~ 返回 summary。
+
+~g~ 合入 summary 当前已有的线程头并重试失败正文，~C-u g~ 重取正文；它们不会
+自行扫描服务器。先用 Gnus 的刷新命令获取新消息。nndouban 的 ~RET~ 会先抓取
+完整讨论再打开本视图。
+
+加载和移动不自动标已读。正文逐条通过 Gnus 读取，保留缓存、agent 和后端行为；
+打开时若后端实现 ~request-thread~，先通过 Gnus 原生接口补齐该讨论的头。
+单次同步读取仍可能阻塞。普通文本及 HTML 可直接阅读，HTML 经 SHR 渲染。
+附件、签名验证和加密正文交给 ~o~ 打开的 Gnus 原生视图。
+
+视图保留折叠、光标与窗口滚动位置。源 summary 关闭或切换到其他组后，旧视图
+停止操作，需从原组重新打开。mixed-pitch 等沿用 thread-reader-mode-hook。
