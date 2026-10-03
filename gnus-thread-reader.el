@@ -93,7 +93,7 @@ An explicit stack and identity set also tolerate malformed cyclic trees."
   "Return a display label for NUMBER's current Gnus state."
   (with-current-buffer (gnus-thread-reader--source)
     (let ((mark (gnus-summary-article-mark number)))
-      (cond ((eq mark gnus-ticked-mark) "[Later]")
+      (cond ((eq mark gnus-ticked-mark) "[Ticked]")
             ((eq mark gnus-dormant-mark) "[Dormant]")
             ((eq mark gnus-unread-mark) "[Unread]")
             ((eq mark gnus-expirable-mark) "[Expirable]")
@@ -155,7 +155,7 @@ An explicit stack and identity set also tolerate malformed cyclic trees."
             (set-window-hscroll window hscroll)
             (set-window-vscroll window vscroll t)))))
     (setq header-line-format
-          (format "Gnus · %d articles · %d loading   d read · U unread · ! later · N next unread · r reply · o original"
+          (format "Gnus · %d articles · %d loading   d read · U unread · ! tick · N next unread · r reply · o original"
                   (hash-table-count gnus-thread-reader--headers)
                   (length gnus-thread-reader--queue)))))
 

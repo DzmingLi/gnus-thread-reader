@@ -7,7 +7,7 @@ Gnus 负责取文、MIME、阅读状态、缓存和 message-mode 撰写；视图
 也可以启用 ~gnus-thread-reader-summary-mode~ ，用 ~C-c C-t~ 打开。
 
 ~n/p~ 移动楼层，~TAB~ 折叠，~N~ 下一未读，~d~ 标记当前楼已读，~U~ 未读，
-~!~ 稍后读，~?~ dormant，~*~ Gnus 缓存，~r~ 回复，~C-u r~ 引用回复，
+~!~ Gnus tick，~?~ dormant，~*~ Gnus 缓存，~r~ 回复，~C-u r~ 引用回复，
 ~o~ 原生文章查看器，~s~ 返回 summary。
 
 ~g~ 合入 summary 当前已有的线程头并重试失败正文，~C-u g~ 重取正文；它们不会
