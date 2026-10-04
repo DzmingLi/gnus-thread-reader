@@ -143,3 +143,24 @@
                      '((img "[图片]" nil)
                        (a "[图片]" "linked.png")
                        (img "[图片]" "poster.png")))))))
+
+(ert-deftest gnus-thread-reader-image-marker-follows-body-indentation ()
+  (with-temp-buffer
+    (let (request)
+      (cl-letf (((symbol-function 'url-queue-retrieve)
+                 (lambda (_url callback &optional args &rest _)
+                   (setq request (cons callback args))))
+                ((symbol-function 'shr-tag-img)
+                 (lambda (_dom &optional _url)
+                   (let ((start (point-marker)))
+                     (insert (propertize "*" 'image-url "https://example.org/image"))
+                     (url-queue-retrieve "https://example.org/image"
+                                         #'shr-image-fetched
+                                         (list (current-buffer) start (point-marker)))))))
+        (thread-reader--body
+         (make-thread-reader-entry :body-format 'html :body "<img src='image'>")))
+      (let ((start (nth 2 request)) (end (nth 3 request)))
+        (should (< start end))
+        (should (equal (get-text-property start 'image-url)
+                       "https://example.org/image"))
+        (should (equal (buffer-substring-no-properties start end) "*"))))))

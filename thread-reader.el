@@ -313,6 +313,11 @@ With RESET start with an empty tree.  Return no value of interest."
     ;; must not insert an image into the newly rendered text at those markers.
     (cl-letf (((symbol-function 'url-queue-retrieve)
                (lambda (url callback &optional args silent inhibit-cookies)
+                 ;; Body indentation inserts text at the placeholder's start.
+                 ;; Keep SHR's start marker on the image, after that text.
+                 (when (and (eq callback #'shr-image-fetched)
+                            (markerp (nth 1 args)))
+                   (set-marker-insertion-type (nth 1 args) t))
                  (funcall retrieve url
                           (lambda (status &rest callback-args)
                             (if (and (buffer-live-p buffer)
