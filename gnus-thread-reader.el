@@ -194,10 +194,15 @@ and encrypted data are left to Gnus's native article viewer."
      ((and (member type '("text/plain" "text/html"))
            (not (equal (car (mm-handle-disposition handle)) "attachment")))
       (let* ((charset (mail-content-type-get (mm-handle-type handle) 'charset))
+             (decoded (or (eq charset 'gnus-decoded)
+                          (equal charset "gnus-decoded")))
              (coding (or (mm-charset-to-coding-system charset) 'utf-8))
-             (bytes (mm-get-part handle)))
+             (bytes (if decoded
+                        (with-current-buffer (mm-handle-buffer handle)
+                          (buffer-string))
+                      (mm-get-part handle))))
         (list (cons (if (equal type "text/html") 'html 'plain)
-                    (if (eq charset 'gnus-decoded) bytes
+                    (if decoded bytes
                       (decode-coding-string bytes coding)))))))))
 
 (defun gnus-thread-reader--body-from-buffer ()
@@ -228,7 +233,6 @@ Never run an attachment viewer or fetch remote resources."
          (gnus-newsgroup-name gnus-thread-reader--group))
     (gnus-thread-reader--checked-header number (mail-header-id header))
     (with-temp-buffer
-      (set-buffer-multibyte nil)
       (unless (gnus-request-article-this-buffer number gnus-newsgroup-name)
         (error "Article unavailable from Gnus"))
       (gnus-thread-reader--body-from-buffer))))

@@ -92,4 +92,36 @@
         (gnus-thread-reader-summary-mode -1)
         (should-not (local-variable-p 'gnus-thread-hide-subtree))))))
 
+(ert-deftest gnus-thread-reader-fetch-preserves-decoded-unicode ()
+  (let ((header (make-full-mail-header 1 "Title" "Author" "" "<1@test>"
+                                       "" 0 0 "" nil))
+        (text "中文與數學，café"))
+    (cl-letf (((symbol-function 'gnus-thread-reader--source)
+               (lambda () (current-buffer)))
+              ((symbol-function 'gnus-thread-reader--checked-header)
+               (lambda (&rest _) t))
+              ((symbol-function 'gnus-request-article-this-buffer)
+               (lambda (&rest _)
+                 ;; Backends such as nnrss write already decoded text.
+                 (insert "Content-Type: text/plain; charset=gnus-decoded\n"
+                         "Content-Transfer-Encoding: 8bit\n\n" text)
+                 t)))
+      (should (equal (gnus-thread-reader--fetch header) (cons 'plain text))))))
+
+(ert-deftest gnus-thread-reader-fetch-decodes-wire-utf8 ()
+  (let ((header (make-full-mail-header 1 "Title" "Author" "" "<1@test>"
+                                       "" 0 0 "" nil))
+        (text "<p>中文與數學，café</p>"))
+    (cl-letf (((symbol-function 'gnus-thread-reader--source)
+               (lambda () (current-buffer)))
+              ((symbol-function 'gnus-thread-reader--checked-header)
+               (lambda (&rest _) t))
+              ((symbol-function 'gnus-request-article-this-buffer)
+               (lambda (&rest _)
+                 (insert "Content-Type: text/html; charset=utf-8\n"
+                         "Content-Transfer-Encoding: base64\n\n"
+                         (base64-encode-string (encode-coding-string text 'utf-8)))
+                 t)))
+      (should (equal (gnus-thread-reader--fetch header) (cons 'html text))))))
+
 ;;; gnus-thread-reader-test.el ends here
