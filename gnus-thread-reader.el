@@ -32,6 +32,7 @@
 (defvar-local gnus-thread-reader--anchor-id nil)
 (defvar-local gnus-thread-reader--headers nil)
 (defvar-local gnus-thread-reader--bodies nil)
+(defvar-local gnus-thread-reader--article-groups nil)
 (defvar-local gnus-thread-reader--queue nil)
 (defvar-local gnus-thread-reader--timer nil)
 (defvar-local gnus-thread-reader--generation 0)
@@ -101,6 +102,30 @@ An explicit stack and identity set also tolerate malformed cyclic trees."
             ((memq number gnus-newsgroup-cached) "[Saved]")
             (t "[Read]")))))
 
+(defun gnus-thread-reader--root-header (entry)
+  "Insert Article-style headers for root ENTRY, without a reply heading."
+  (let* ((id (thread-reader-entry-id entry))
+         (header (gethash id gnus-thread-reader--headers))
+         (xref (cadr (split-string (or (mail-header-xref header) ""))))
+         (source-group (and xref (string-match "\\`\\(.*\\):[0-9]+\\'" xref)
+                            (gnus-group-real-name (match-string 1 xref))))
+         (fields `(("From" . ,(gnus-thread-reader--author header))
+                   ("Subject" . ,(gnus-thread-reader--decode-header
+                                  (mail-header-subject header)))
+                   ("Newsgroups" . ,(or (gethash id gnus-thread-reader--article-groups)
+                                         source-group))
+                   ("Date" . ,(mail-header-date header)))))
+    (dolist (field fields)
+      (when (cdr field)
+        (let* ((text (concat (car field) ": " (thread-reader--line (cdr field))))
+               (faces (cl-find-if
+                       (lambda (spec) (string-match-p (car spec) text))
+                       gnus-header-face-alist)))
+          (insert (propertize (concat (car field) ": ") 'face (nth 1 faces))
+                  (propertize (thread-reader--line (cdr field)) 'face (nth 2 faces))
+                  "\n"))))
+    (insert "\n")))
+
 (defun gnus-thread-reader--render ()
   "Render the view, retaining the viewport, point and folded subtrees."
   (let ((windows
@@ -130,6 +155,8 @@ An explicit stack and identity set also tolerate malformed cyclic trees."
                 (start (gethash id thread-reader--positions))
                 (number (mail-header-number header)))
            (when (and start (> number 0)
+                      (thread-reader-entry-parent-id
+                       (gethash id thread-reader--entries))
                       (equal (gnus-thread-reader--state number) "[Read]"))
              (save-excursion
                (goto-char start)
@@ -229,12 +256,16 @@ Never run an attachment viewer or fetch remote resources."
 (defun gnus-thread-reader--fetch (header)
   "Fetch HEADER through Gnus, including its cache, without reading it."
   (let* ((number (mail-header-number header))
+         (article-groups gnus-thread-reader--article-groups)
          (gnus-summary-buffer (gnus-thread-reader--source))
          (gnus-newsgroup-name gnus-thread-reader--group))
     (gnus-thread-reader--checked-header number (mail-header-id header))
     (with-temp-buffer
       (unless (gnus-request-article-this-buffer number gnus-newsgroup-name)
         (error "Article unavailable from Gnus"))
+      (when (hash-table-p article-groups)
+        (puthash (number-to-string number) (mail-fetch-field "newsgroups")
+                 article-groups))
       (gnus-thread-reader--body-from-buffer))))
 
 (defun gnus-thread-reader--mark-current-read ()
@@ -332,7 +363,7 @@ use Gnus's normal update commands and then refresh or reopen this view."
           gnus-thread-reader--queue (nreverse queue)
           thread-reader--discussion
           (make-thread-reader-discussion
-           :id gnus-thread-reader--anchor-id :url gnus-thread-reader--group
+           :id gnus-thread-reader--anchor-id
            :title (gnus-thread-reader--decode-header (mail-header-subject header))))
     (gnus-thread-reader--render)
     (gnus-thread-reader--schedule)))
@@ -472,9 +503,15 @@ Visiting a loaded article marks it read.  Background loading leaves other
 articles unread.
 \{gnus-thread-reader-mode-map}"
   (setq-local thread-reader-auto-load-replies nil)
+  (setq-local thread-reader-root-header-function #'gnus-thread-reader--root-header)
+  (setq-local outline-regexp "\\(?:From: \\|\\*+ \\)")
+  (setq-local outline-level
+              (lambda () (if (looking-at "From: ") 1
+                           (- (match-end 0) (match-beginning 0) 1))))
   (setq-local revert-buffer-function #'gnus-thread-reader-refresh)
   (setq gnus-thread-reader--headers (make-hash-table :test #'equal)
-        gnus-thread-reader--bodies (make-hash-table :test #'equal))
+        gnus-thread-reader--bodies (make-hash-table :test #'equal)
+        gnus-thread-reader--article-groups (make-hash-table :test #'equal))
   (add-hook 'post-command-hook #'gnus-thread-reader--visit-at-point nil t)
   (add-hook 'kill-buffer-hook #'gnus-thread-reader--cancel nil t)
   (add-hook 'change-major-mode-hook #'gnus-thread-reader--cancel nil t))

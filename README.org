@@ -2,6 +2,9 @@
 
 将 Gnus 已知的一段讨论渲染成连续 Outline 回复树。视图实现随本包安装，不再需要单独安装 thread-reader。GPL-3.0-or-later。
 Gnus 负责取文、MIME、阅读状态、缓存和 message-mode 撰写；视图不创建第二套状态数据库。
+根文章显示 Article 风格的 From、Subject、Newsgroups、Date 文章头和正文，沿用
+~gnus-header-face-alist~，不显示星号楼层标题或内部虚拟组名。回复追加在根文章下方，
+保留分隔线、缩进和 Outline 折叠。Newsgroups 使用原文章头或真实来源组。
 
 将目录加入 load-path，在 Gnus summary 中执行 ~M-x gnus-thread-reader-open~ 。
 启用 ~gnus-thread-reader-global-summary-mode~ 后，所有 Gnus Summary 默认折叠为每个讨论一行，按 ~RET~ 打开阅读视图。也可以只在某个 Summary 启用 ~gnus-thread-reader-summary-mode~ 。折叠使用 Gnus 原生机制，与 timeline 和后端无关。

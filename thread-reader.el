@@ -147,6 +147,10 @@ Install and load a backend package to register it.")
 
 (defvar-local thread-reader--backend nil)
 (defvar-local thread-reader--url nil)
+(defvar-local thread-reader-root-header-function nil
+  "Optional function inserting a root article's headers, given its entry.
+When set, omit the separate discussion banner and root Outline stars.
+Replies retain their ordinary Outline headings.")
 (defvar-local thread-reader--discussion nil)
 (defvar-local thread-reader--entries nil)
 (defvar-local thread-reader--order nil)
@@ -394,13 +398,18 @@ Indent body text so its headings are not mistaken for tree headings."
     (setq thread-reader--render-token (make-symbol "render"))
     (erase-buffer)
     (setq thread-reader--positions (make-hash-table :test #'equal))
-    (insert (propertize
+    (unless thread-reader-root-header-function
+      (insert (propertize
              (thread-reader--line
               (if thread-reader--discussion
                   (thread-reader-discussion-title thread-reader--discussion)
                 "Opening discussion…"))
              'face 'bold)
-            "\n" (thread-reader--line thread-reader--url) "\n\n")
+            "\n")
+    (when-let* ((url (and thread-reader--discussion
+                         (thread-reader-discussion-url thread-reader--discussion))))
+      (insert (thread-reader--line url) "\n"))
+      (insert "\n"))
     (when (gethash 'open thread-reader--pending) (insert "Loading discussion…\n\n"))
     (when-let* ((err (gethash 'open thread-reader--errors)))
       (insert "Could not open discussion: " (thread-reader--line err) "\n")
@@ -425,7 +434,9 @@ Indent body text so its headings are not mistaken for tree headings."
                 (indent (* (1- depth) thread-reader-indent-offset)))
             (let ((start (point)))
                 (puthash node (copy-marker start) thread-reader--positions)
-                (insert (make-string depth ?*) " "
+                (if (and (= depth 1) thread-reader-root-header-function)
+                    (funcall thread-reader-root-header-function entry)
+                  (insert (make-string depth ?*) " "
                         (propertize (thread-reader--line
                                      (thread-reader-entry-author entry))
                                     'face 'font-lock-keyword-face))
@@ -437,7 +448,7 @@ Indent body text so its headings are not mistaken for tree headings."
                 (insert (propertize " " 'display '(space :align-to (- right-fringe 1))
                                     'face 'thread-reader-separator
                                     'rear-nonsticky t)
-                        "\n")
+                        "\n"))
                 (thread-reader--body entry indent)
               (add-text-properties start (point) `(thread-reader-id ,node)))
             ;; Put this control before descendants, so folding the final child

@@ -164,3 +164,43 @@
         (should (equal (get-text-property start 'image-url)
                        "https://example.org/image"))
         (should (equal (buffer-substring-no-properties start end) "*"))))))
+
+(ert-deftest gnus-thread-reader-does-not-display-backend-routing-key ()
+  (with-temp-buffer
+    (thread-reader-mode)
+    (setq thread-reader--url "nnvirtual:timeline"
+          thread-reader--discussion (make-thread-reader-discussion :title "Article"))
+    (thread-reader--render)
+    (should (equal (buffer-string) "Article\n\n"))
+    (setf (thread-reader-discussion-url thread-reader--discussion) "https://example.org/post")
+    (thread-reader--render)
+    (should (equal (buffer-string) "Article\nhttps://example.org/post\n\n"))))
+
+(ert-deftest gnus-thread-reader-root-is-article-replies-remain-outline ()
+  (with-temp-buffer
+    (gnus-thread-reader-mode)
+    (let ((header (make-full-mail-header 1 "Root subject" "Alice <alice@example.org>"
+                                         "Sun, 4 Oct 2026 00:00:00 +0000"
+                                         "<root@example.org>" "" 0 0 nil nil)))
+      (puthash "1" header gnus-thread-reader--headers)
+      (puthash "1" "real.group" gnus-thread-reader--article-groups)
+      (setq thread-reader--url "nnvirtual:timeline"
+            thread-reader--discussion (make-thread-reader-discussion :title "Root subject"))
+      (thread-reader--merge
+       (list (make-thread-reader-entry :id "1" :author "Alice" :body "Root body")
+             (make-thread-reader-entry :id "2" :parent-id "1" :author "Bob" :body "Reply body")) t)
+      (thread-reader--render)
+      (goto-char (point-min))
+      (should (looking-at "From: Alice"))
+      (should (search-forward "Subject: Root subject\nNewsgroups: real.group\n" nil t))
+      (should-not (string-match-p "nnvirtual:timeline" (buffer-string)))
+      (goto-char (gethash "1" thread-reader--positions))
+      (thread-reader-next)
+      (should (looking-at "\\*\\* Bob"))
+      (thread-reader-parent)
+      (should (looking-at "From: Alice"))
+      (goto-char (gethash "2" thread-reader--positions))
+      (thread-reader-toggle)
+      (should (invisible-p (save-excursion (search-forward "Reply body") (1- (point)))))
+      (should-not (invisible-p (save-excursion (goto-char (point-min))
+                                             (search-forward "Root body") (1- (point))))))))
