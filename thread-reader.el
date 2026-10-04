@@ -301,9 +301,9 @@ With RESET start with an empty tree.  Return no value of interest."
              dom)
     (add-face-text-property start (point) 'fixed-pitch)))
 
-(defun thread-reader--shr-image (dom)
-  "Render image DOM with an explicit label when alternative text is absent."
-  (let ((image (copy-tree dom))
+(defun thread-reader--shr-image (dom &optional url)
+  "Render image DOM and optional URL using SHR's image renderer contract."
+  (let ((image (if dom (copy-tree dom) '(img nil)))
         (buffer (current-buffer))
         (token thread-reader--render-token)
         (retrieve (symbol-function 'url-queue-retrieve)))
@@ -322,7 +322,7 @@ With RESET start with an empty tree.  Return no value of interest."
                                 (url-store-in-cache (current-buffer)))
                               (kill-buffer (current-buffer))))
                           args silent inhibit-cookies))))
-      (shr-tag-img image))))
+      (shr-tag-img image url))))
 
 (defun thread-reader--body (entry &optional indent)
   "Insert ENTRY's body, allowing for INDENT display columns at the left.

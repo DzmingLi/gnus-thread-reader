@@ -125,3 +125,21 @@
       (should (equal (gnus-thread-reader--fetch header) (cons 'html text))))))
 
 ;;; gnus-thread-reader-test.el ends here
+
+(ert-deftest gnus-thread-reader-image-renderer-accepts-shr-media-url ()
+  ;; SHR dispatches linked images and video posters with a second argument,
+  ;; and a video poster can have no DOM at all.
+  (with-temp-buffer
+    (let ((shr-external-rendering-functions
+           '((img . thread-reader--shr-image)))
+          calls)
+      (cl-letf (((symbol-function 'shr-tag-img)
+                 (lambda (dom &optional url)
+                   (push (list (dom-tag dom) (dom-attr dom 'alt) url) calls))))
+        (shr-indirect-call 'img '(img ((src . "inline.png"))))
+        (shr-indirect-call 'img '(a nil) "linked.png")
+        (shr-indirect-call 'img nil "poster.png"))
+      (should (equal (nreverse calls)
+                     '((img "[图片]" nil)
+                       (a "[图片]" "linked.png")
+                       (img "[图片]" "poster.png")))))))
