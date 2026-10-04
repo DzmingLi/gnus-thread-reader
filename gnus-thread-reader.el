@@ -25,6 +25,7 @@
 (require 'mm-util)
 (require 'mail-parse)
 
+(defvar gnus-thread-reader-summary-mode)
 (defvar-local gnus-thread-reader--summary nil)
 (defvar-local gnus-thread-reader--group nil)
 (defvar-local gnus-thread-reader--anchor nil)
@@ -489,7 +490,9 @@ articles unread.
     ;; Let Gnus complete the thread through any backend that implements
     ;; request-thread.  The reader remains independent of backend names.
     (when (gnus-check-backend-function 'request-thread group)
-      (gnus-summary-refer-thread nil))
+      (gnus-summary-refer-thread nil)
+      (when gnus-thread-reader-summary-mode
+        (gnus-summary-maybe-hide-threads)))
     (let ((buffer (generate-new-buffer "*Gnus Thread*")))
       (condition-case err
           (with-current-buffer buffer
@@ -507,13 +510,52 @@ articles unread.
 
 (defvar gnus-thread-reader-summary-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-t") #'gnus-thread-reader-open)
+    (define-key map (kbd "RET") #'gnus-thread-reader-open)
     map))
+
+(defvar-local gnus-thread-reader--summary-settings nil)
+
+(defun gnus-thread-reader--summary-policy ()
+  "Use Gnus's native collapsed thread display in reader summaries.
+Run after group parameters are applied, including when Gnus regenerates
+an existing summary.  Gnus performs the folding after kill processing."
+  (when gnus-thread-reader-summary-mode
+    (setq-local gnus-show-threads t)
+    (setq-local gnus-thread-hide-subtree t)))
 
 ;;;###autoload
 (define-minor-mode gnus-thread-reader-summary-mode
-  "Open a continuous thread view with C-c C-t."
-  :lighter "" :keymap gnus-thread-reader-summary-mode-map)
+  "Keep conversations collapsed and open them with RET in the reader.
+This applies to any Gnus summary, independently of its backend or group."
+  :lighter "" :keymap gnus-thread-reader-summary-mode-map
+  (if gnus-thread-reader-summary-mode
+      (progn
+        (unless gnus-thread-reader--summary-settings
+          (setq gnus-thread-reader--summary-settings
+                (mapcar (lambda (symbol)
+                          (list symbol (local-variable-p symbol)
+                                (symbol-value symbol)))
+                        '(gnus-show-threads gnus-thread-hide-subtree))))
+        (add-hook 'gnus-summary-generate-hook
+                  #'gnus-thread-reader--summary-policy nil t)
+        (gnus-thread-reader--summary-policy)
+        (when gnus-newsgroup-threads
+          (gnus-summary-maybe-hide-threads)))
+    (remove-hook 'gnus-summary-generate-hook
+                 #'gnus-thread-reader--summary-policy t)
+    (dolist (setting gnus-thread-reader--summary-settings)
+      (if (nth 1 setting)
+          (set (car setting) (nth 2 setting))
+        (kill-local-variable (car setting))))
+    (setq gnus-thread-reader--summary-settings nil)))
+
+;;;###autoload
+(define-globalized-minor-mode gnus-thread-reader-global-summary-mode
+  gnus-thread-reader-summary-mode
+  (lambda ()
+    (when (derived-mode-p 'gnus-summary-mode)
+      (gnus-thread-reader-summary-mode 1)))
+  :group 'gnus)
 
 (provide 'gnus-thread-reader)
 ;;; gnus-thread-reader.el ends here

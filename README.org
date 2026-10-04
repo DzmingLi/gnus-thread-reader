@@ -4,7 +4,7 @@
 Gnus 负责取文、MIME、阅读状态、缓存和 message-mode 撰写；视图不创建第二套状态数据库。
 
 将目录加入 load-path，在 Gnus summary 中执行 ~M-x gnus-thread-reader-open~ 。
-也可以启用 ~gnus-thread-reader-summary-mode~ ，用 ~C-c C-t~ 打开。
+启用 ~gnus-thread-reader-global-summary-mode~ 后，所有 Gnus Summary 默认折叠为每个讨论一行，按 ~RET~ 打开阅读视图。也可以只在某个 Summary 启用 ~gnus-thread-reader-summary-mode~ 。折叠使用 Gnus 原生机制，与 timeline 和后端无关。
 
 ~n/p~ 移动楼层，~TAB~ 折叠，~N~ 下一未读，~d~ 标记当前楼已读，~U~ 未读，
 ~!~ Gnus tick，~?~ dormant，~*~ Gnus 缓存，~r~ 回复，~C-u r~ 引用回复，

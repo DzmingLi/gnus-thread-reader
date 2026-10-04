@@ -56,4 +56,40 @@
       (kill-buffer reader)
       (kill-buffer summary))))
 
+(ert-deftest gnus-thread-reader-summary-policy-survives-group-parameters ()
+  (with-temp-buffer
+    (let ((gnus-newsgroup-threads nil))
+      (setq-local gnus-show-threads nil)
+      (setq-local gnus-thread-hide-subtree nil)
+      (gnus-thread-reader-summary-mode 1)
+      ;; Group parameters are applied after mode hooks on group entry.
+      (setq-local gnus-show-threads nil)
+      (setq-local gnus-thread-hide-subtree nil)
+      (run-hooks 'gnus-summary-generate-hook)
+      (should gnus-show-threads)
+      (should gnus-thread-hide-subtree)
+      (should (eq (lookup-key gnus-thread-reader-summary-mode-map
+                              (kbd "RET"))
+                  #'gnus-thread-reader-open))
+      (gnus-thread-reader-summary-mode -1)
+      (should-not gnus-show-threads)
+      (should-not gnus-thread-hide-subtree)
+      (should-not (memq #'gnus-thread-reader--summary-policy
+                       gnus-summary-generate-hook)))))
+
+(ert-deftest gnus-thread-reader-summary-enable-folds-existing-summary ()
+  (with-temp-buffer
+    (let ((gnus-newsgroup-threads '(existing-thread))
+          folded)
+      (cl-letf (((symbol-function 'gnus-summary-hide-all-threads)
+                 (lambda (&optional predicate)
+                   (should-not predicate)
+                   (setq folded t))))
+        (gnus-thread-reader-summary-mode 1)
+        (should folded)
+        ;; Re-enabling must not overwrite the saved native settings.
+        (gnus-thread-reader-summary-mode 1)
+        (gnus-thread-reader-summary-mode -1)
+        (should-not (local-variable-p 'gnus-thread-hide-subtree))))))
+
 ;;; gnus-thread-reader-test.el ends here
